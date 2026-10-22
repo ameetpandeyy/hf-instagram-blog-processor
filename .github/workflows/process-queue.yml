@@ -10,12 +10,28 @@ jobs:
   process-queue:
     runs-on: ubuntu-latest
     steps:
+      - name: Check if secrets are configured
+        run: |
+          if [ -z "${{ secrets.NEXTJS_APP_URL }}" ]; then
+            echo "??  NEXTJS_APP_URL secret not configured"
+            echo "This workflow will be skipped until secrets are added."
+            echo ""
+            echo "To configure:"
+            echo "1. Go to GitHub repo ? Settings ? Secrets ? Actions"
+            echo "2. Add: NEXTJS_APP_URL (e.g., https://ameetpandey.com)"
+            echo "3. Add: CRON_SECRET (random string)"
+            exit 0
+          fi
+          echo "? Secrets configured, proceeding..."
+      
       - name: Trigger Next.js to check queue
+        if: secrets.NEXTJS_APP_URL != ''
         run: |
           echo "?? Triggering Next.js to check for pending jobs..."
-          curl -X GET '${{ secrets.NEXTJS_APP_URL }}/api/cron/trigger-hf-space' \
-            -H 'Authorization: Bearer ${{ secrets.CRON_SECRET }}' \
-            -H 'Content-Type: application/json' \
-            -v
+          
+          curl -X GET "${{ secrets.NEXTJS_APP_URL }}/api/cron/trigger-hf-space" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -v || echo "??  Trigger failed - Next.js API may not be ready yet"
           
           echo "? Cron trigger completed"
