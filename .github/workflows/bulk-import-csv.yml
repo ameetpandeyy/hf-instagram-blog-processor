@@ -1,0 +1,146 @@
+﻿name: Bulk Import Instagram Posts from CSV
+
+on:
+  workflow_dispatch:  # Manual trigger only
+    inputs:
+      limit:
+        description: 'Number of posts to process (default: all)'
+        required: false
+        type: number
+        default: 0
+
+jobs:
+  bulk-import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install supabase
+      
+      - name: Parse CSV and queue jobs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          HF_SPACE_URL: https://ameetspeaks-templeappai.hf.space
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+        run: |
+          python3 << 'EOF'
+          import csv
+          import os
+          import sys
+          import hashlib
+          import hmac
+          from datetime import datetime
+          from supabase import create_client
+
+          # Configuration
+          SUPABASE_URL = os.getenv("SUPABASE_URL")
+          SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+          HF_SPACE_URL = os.getenv("HF_SPACE_URL")
+          WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
+          LIMIT = int("${{ inputs.limit }}") if "${{ inputs.limit }}" else 0
+
+          if not all([SUPABASE_URL, SUPABASE_SERVICE_KEY]):
+              print("❌ Missing required environment variables")
+              sys.exit(1)
+
+          # Initialize Supabase
+          supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+          # Read and parse CSV
+          csv_file = "data/instagram-posts.csv"
+          if not os.path.exists(csv_file):
+              print(f"❌ CSV file not found: {csv_file}")
+              sys.exit(1)
+
+          print(f"📄 Reading {csv_file}...")
+
+          with open(csv_file, 'r', encoding='utf-8-sig') as f:
+              reader = csv.DictReader(f)
+              posts = list(reader)
+
+          total_posts = len(posts)
+          posts_to_process = posts[:LIMIT] if LIMIT > 0 else posts
+
+          print(f"📊 Found {total_posts} posts, processing {len(posts_to_process)}...")
+
+          # Queue each post as a job
+          queued = 0
+          skipped = 0
+          errors = []
+
+          for idx, post in enumerate(posts_to_process, 1):
+              instagram_url = post.get('Instagram URL', '').strip()
+              
+              if not instagram_url:
+                  print(f"⚠️  Row {idx}: Skipping (no Instagram URL)")
+                  skipped += 1
+                  continue
+
+              try:
+                  # Check if job already exists
+                  existing = supabase.table('processing_jobs').select('id').eq('instagram_url', instagram_url).eq('status', 'pending').execute()
+                  
+                  if existing.data:
+                      print(f"⏭️  Row {idx}: Already queued ({instagram_url})")
+                      skipped += 1
+                      continue
+
+                  # Create job in Supabase
+                  job_data = {
+                      'instagram_url': instagram_url,
+                      'status': 'pending',
+                      'metadata': {
+                          'csv_row': idx,
+                          'title': post.get('Suggested Blog Title', ''),
+                          'category': post.get('Topic Category', ''),
+                          'content_type': post.get('Content Type for Blog', '')
+                      },
+                      'created_at': datetime.utcnow().isoformat(),
+                      'updated_at': datetime.utcnow().isoformat()
+                  }
+
+                  result = supabase.table('processing_jobs').insert(job_data).execute()
+                  
+                  if result.data:
+                      print(f"✅ Row {idx}: Queued {instagram_url}")
+                      queued += 1
+                  else:
+                      errors.append(f"Row {idx}: Failed to insert")
+                      
+              except Exception as e:
+                  errors.append(f"Row {idx}: {str(e)}")
+                  print(f"❌ Row {idx}: Error - {e}")
+
+          # Summary
+          print("\n" + "="*60)
+          print(f"🎉 Bulk import complete!")
+          print(f"✅ Queued: {queued}")
+          print(f"⏭️  Skipped: {skipped}")
+          print(f"❌ Errors: {len(errors)}")
+          print("="*60)
+
+          if errors:
+              print("\nErrors:")
+              for error in errors[:10]:  # Show first 10 errors
+                  print(f"  • {error}")
+
+          sys.exit(0 if queued > 0 else 1)
+          EOF
+      
+      - name: Trigger HF Space webhook (optional)
+        if: success()
+        env:
+          HF_SPACE_URL: https://ameetspeaks-templeappai.hf.space
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+        run: |
+          echo "✅ Jobs queued. HF Space will process them via cron."
+          echo "Or manually trigger: POST ${HF_SPACE_URL}/webhook/process-job"
