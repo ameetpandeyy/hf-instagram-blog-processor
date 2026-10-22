@@ -9,8 +9,7 @@ Pillow==10.2.0
 transformers==4.36.2
 torch==2.1.2
 supabase==2.3.0
-httpx==0.26.0
+httpx==0.24.1
 psutil==5.9.8
 pytest==7.4.4
 black==24.1.1
-psutil==5.9.8
