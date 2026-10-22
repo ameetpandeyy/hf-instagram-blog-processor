@@ -23,10 +23,10 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
           
-          # Add HuggingFace Space as remote
-          git remote add space https://ameetspeaks:${HF_TOKEN}@huggingface.co/spaces/ameetspeaks/templeappai || true
+          # Add HuggingFace Space as remote with token in URL
+          git remote add space https://ameetspeaks:$HF_TOKEN@huggingface.co/spaces/ameetspeaks/templeappai 2>/dev/null || git remote set-url space https://ameetspeaks:$HF_TOKEN@huggingface.co/spaces/ameetspeaks/templeappai
           
           # Push to HuggingFace Space
-          git push --force space main:main
+          git push space main:main --force
           
-          echo "? Successfully synced to HuggingFace Space!"
+          echo "? Successfully synced to HuggingFace Space: https://huggingface.co/spaces/ameetspeaks/templeappai"
