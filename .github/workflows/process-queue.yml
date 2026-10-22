@@ -1,0 +1,21 @@
+name: Process Instagram Queue
+
+on:
+  schedule:
+    # Every 5 minutes
+    - cron: '*/5 * * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  process-queue:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Next.js to check queue
+        run: |
+          echo "?? Triggering Next.js to check for pending jobs..."
+          curl -X GET '${{ secrets.NEXTJS_APP_URL }}/api/cron/trigger-hf-space' \
+            -H 'Authorization: Bearer ${{ secrets.CRON_SECRET }}' \
+            -H 'Content-Type: application/json' \
+            -v
+          
+          echo "? Cron trigger completed"
