@@ -1,6 +1,6 @@
 ﻿---
 title: Instagram Blog Processor
-emoji: 📸
+emoji: 🤖
 colorFrom: purple
 colorTo: pink
 sdk: docker
@@ -23,22 +23,22 @@ AI service for processing Instagram posts into blog articles with social cards.
 
 ## API Endpoints
 
-- `GET /health` - Health check
-- `POST /webhook/process-job` - Process Instagram job
+- GET /health - Health check
+- POST /webhook/process-job - Process Instagram job
 
 ## Environment Variables
 
-Set these in Space Settings → Variables and secrets:
+Set these in Space Settings - Variables and secrets:
 
-- `GEMINI_API_KEY` - Google Gemini API key
-- `SUPABASE_URL` - Supabase project URL
-- `SUPABASE_SERVICE_KEY` - Supabase service role key
-- `WEBHOOK_SECRET` - Secret for webhook authentication
-- `CALLBACK_URL` - Next.js callback URL
-- `CALLBACK_SECRET` - Secret for callback authentication
+- GEMINI_API_KEY - Google Gemini API key
+- SUPABASE_URL - Supabase project URL
+- SUPABASE_SERVICE_KEY - Supabase service role key
+- WEBHOOK_SECRET - Secret for webhook authentication
+- CALLBACK_URL - Next.js callback URL
+- CALLBACK_SECRET - Secret for callback authentication
 
 ## Docker
 
-This Space uses a custom Dockerfile. See `Dockerfile` for details.
+This Space uses a custom Dockerfile. See Dockerfile for details.
 
 Port: 7860
