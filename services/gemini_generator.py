@@ -1,4 +1,4 @@
-﻿"""Gemini Blog Generator - Generate 800+ word blog articles using Gemini 3.5 Flash"""
+"""Gemini Blog Generator - Generate 500+ word blog articles using Gemini 3.5 Flash"""
 import logging
 import time
 from google import genai
@@ -36,29 +36,28 @@ You are a skilled content writer creating SEO-optimized blog posts for ameetpand
 {caption}
 
 **Instructions**:
-Write a comprehensive, in-depth blog article (MINIMUM 800 words, target 900-1000 words) based on the Instagram content above.
+Write a comprehensive, in-depth blog article (MINIMUM 500 words, ideally 600-700 words) based on the Instagram content above.
 
 **Structure**:
 1. **Catchy Title** - Create an SEO-friendly, engaging title
-2. **Introduction** (120-150 words) - Hook the reader with the main idea, set expectations
-3. **Main Content** (600-750 words) - Expand on the Instagram content with:
+2. **Introduction** (80-100 words) - Hook the reader with the main idea, set expectations
+3. **Main Content** (350-500 words) - Expand on the Instagram content with:
    - Clear explanations and detailed examples
    - Practical insights or actionable tips with step-by-step guidance
    - Personal anecdotes or relatable stories (if applicable)
-   - Use subheadings (##) to organize sections (aim for 4-6 subheadings)
+   - Use subheadings (##) to organize sections (aim for 3-5 subheadings)
    - Add context, background, or supporting data where relevant
-   - Include "why this matters" for each major point
-4. **Conclusion** (80-100 words) - Summarize key takeaways and provide a call-to-action
+   - Include "why this matters" for key points
+4. **Conclusion** (50-100 words) - Summarize key takeaways and provide a call-to-action
 
 **Tone**: Conversational, authentic, and engaging (like talking to a friend)
 
-**CRITICAL**: The article MUST be at least 800 words. If the content seems short, add:
+**CRITICAL**: The article MUST be at least 500 words. If the content seems short, add:
 - More detailed explanations
 - Additional examples or case studies
 - Expanded context or background
-- Deeper "how-to" steps
+- Practical "how-to" steps
 - Common mistakes to avoid
-- FAQ-style subsections
 
 **Special Instructions for {content_type}**:
 """
@@ -72,7 +71,7 @@ Write a comprehensive, in-depth blog article (MINIMUM 800 words, target 900-1000
         }
         
         prompt = base_prompt + type_specific.get(content_type, type_specific["general"])
-        prompt += "\n\n**Output Format**: Pure markdown. Start with # Title, then content sections. MINIMUM 800 WORDS."
+        prompt += "\n\n**Output Format**: Pure markdown. Start with # Title, then content sections. MINIMUM 500 WORDS."
         
         return prompt
     
@@ -123,9 +122,9 @@ Write a comprehensive, in-depth blog article (MINIMUM 800 words, target 900-1000
                 word_count = len(content.split())
                 logger.info(f"✅ Generated blog: {word_count} words, title: {title[:50]}...")
                 
-                # Warn if below 800 words (but don't fail)
-                if word_count < 800:
-                    logger.warning(f"⚠️  Word count below target: {word_count}/800 words")
+                # Warn if below 500 words (but don't fail)
+                if word_count < 500:
+                    logger.warning(f"⚠️  Word count below minimum: {word_count}/500 words")
                 
                 return {
                     "title": title,
