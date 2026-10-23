@@ -3,6 +3,7 @@ import logging
 from typing import Dict, Optional, Any
 from supabase import create_client, Client
 from datetime import datetime
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,26 @@ class SupabaseClient:
             logger.error(f"❌ Failed to update job {job_id}: {str(e)}")
             raise
     
+    def _generate_slug(self, title: str) -> str:
+        """Generate URL-safe slug from title"""
+        slug = title.lower()
+        slug = re.sub(r'[^\w\s-]', '', slug)
+        slug = re.sub(r'[-\s]+', '-', slug)
+        return slug[:100]  # Limit length
+    
+    def _extract_meta_description(self, content: str) -> str:
+        """Extract first 160 chars from content for meta description"""
+        # Remove markdown headings
+        lines = [line for line in content.split('\n') if not line.startswith('#')]
+        text = ' '.join(lines).strip()
+        # Take first 160 chars
+        return text[:160] + ('...' if len(text) > 160 else '')
+    
+    def _calculate_read_time(self, content: str) -> int:
+        """Calculate reading time in minutes (200 words/min)"""
+        word_count = len(content.split())
+        return max(1, round(word_count / 200))
+    
     async def create_draft_post(
         self,
         instagram_url: str,
@@ -59,34 +80,40 @@ class SupabaseClient:
         affiliate_placeholders: Optional[list] = None
     ) -> str:
         """
-        Create draft post in posts table
+        Create draft post in posts table matching the actual schema
         
         Returns:
             Post UUID
         """
         try:
+            slug = self._generate_slug(title)
+            meta_description = self._extract_meta_description(content)
+            read_minutes = self._calculate_read_time(content)
+            
+            # Add Instagram URL and YouTube links as metadata in the content
+            footer = f"\n\n---\n\n**Source**: [Instagram Post]({instagram_url})\n\n"
+            if youtube_links:
+                footer += "**Referenced Videos**:\n"
+                for link in youtube_links:
+                    footer += f"- {link}\n"
+            
             post_data = {
+                "slug": slug,
                 "title": title,
-                "content": content,
-                "instagram_url": instagram_url,
-                "content_type": content_type,
-                "youtube_links": youtube_links,
+                "body_md": content + footer,
+                "meta_description": meta_description,
                 "status": "draft",
-                "needs_finalization": True,
+                "read_minutes": read_minutes,
+                "affiliate": bool(affiliate_placeholders),
+                "ig_caption": f"From Instagram: {instagram_url}",
                 "created_at": datetime.utcnow().isoformat(),
                 "updated_at": datetime.utcnow().isoformat()
             }
             
-            if social_card_url:
-                post_data["social_card_url"] = social_card_url
-            
-            if affiliate_placeholders:
-                post_data["affiliate_links"] = affiliate_placeholders
-            
             result = self.client.table("posts").insert(post_data).execute()
             
             post_id = result.data[0]["id"]
-            logger.info(f"✅ Created draft post: {post_id}")
+            logger.info(f"✅ Created draft post: {post_id} ({slug})")
             
             return post_id
             
@@ -137,6 +164,7 @@ class SupabaseClient:
         except Exception as e:
             logger.error(f"❌ Failed to fetch pending job: {str(e)}")
             raise
+    
     async def get_job(self, job_id: str) -> Optional[Dict[str, Any]]:
         """Get job by ID"""
         try:
