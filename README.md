@@ -11,12 +11,12 @@ app_port: 7860
 
 # Instagram Blog Processor
 
-AI service for processing Instagram posts into blog articles with social cards.
+AI service for processing Instagram posts into blog articles using **Gemini 2.0 Flash**.
 
 ## Features
 
-- Instagram scraping with instaloader
-- Blog generation using Google Gemini API
+- CSV-based metadata extraction (no Instagram scraping needed)
+- Blog generation using Google Gemini 2.0 Flash API (google-genai package)
 - Social card generation with Pillow
 - Content classification
 - Webhook-based job processing
@@ -42,3 +42,5 @@ Set these in Space Settings - Variables and secrets:
 This Space uses a custom Dockerfile. See Dockerfile for details.
 
 Port: 7860
+
+<!-- Force rebuild: v2.1 - Gemini 2.0 Flash with google-genai package -->
