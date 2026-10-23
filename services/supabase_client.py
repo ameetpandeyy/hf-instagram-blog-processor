@@ -137,3 +137,11 @@ class SupabaseClient:
         except Exception as e:
             logger.error(f"❌ Failed to fetch pending job: {str(e)}")
             raise
+    async def get_job(self, job_id: str) -> Optional[Dict[str, Any]]:
+        """Get job by ID"""
+        try:
+            result = self.client.table("processing_jobs").select("*").eq("id", job_id).single().execute()
+            return result.data if result.data else None
+        except Exception as e:
+            logger.error(f"❌ Failed to fetch job {job_id}: {str(e)}")
+            return None

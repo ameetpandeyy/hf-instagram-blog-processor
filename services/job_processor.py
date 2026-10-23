@@ -1,19 +1,18 @@
-﻿"""Job Processor - Orchestrates Instagram-to-blog pipeline"""
+﻿"""Job Processor - Orchestrates Instagram-to-blog pipeline (CSV-based, no scraping)"""
 import logging
 import httpx
 import hashlib
 import hmac
-from typing import Dict, Any
+import re
+from typing import Dict, Any, List
 from app.config import get_settings
-from services.instagram_scraper import InstagramScraper
 from services.gemini_generator import GeminiGenerator
 from services.supabase_client import SupabaseClient
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-# Initialize services (singleton pattern)
-instagram_scraper = InstagramScraper()
+# Initialize services
 gemini_generator = GeminiGenerator(
     api_key=settings.gemini_api_key,
     model_name=settings.gemini_model
@@ -22,6 +21,23 @@ supabase_client = SupabaseClient(
     url=settings.supabase_url,
     service_key=settings.supabase_service_key
 )
+
+def extract_youtube_links(text: str) -> List[str]:
+    """Extract YouTube URLs from text"""
+    if not text:
+        return []
+    
+    youtube_patterns = [
+        r'https?://(?:www\.)?youtube\.com/watch\?v=[\w-]+',
+        r'https?://(?:www\.)?youtube\.com/shorts/[\w-]+',
+        r'https?://youtu\.be/[\w-]+',
+    ]
+    
+    links = []
+    for pattern in youtube_patterns:
+        links.extend(re.findall(pattern, text))
+    
+    return list(set(links))
 
 async def send_callback(job_id: str, status: str, post_data: Dict[str, Any] = None, error: str = None):
     """Send callback to Next.js app"""
@@ -46,9 +62,12 @@ async def send_callback(job_id: str, status: str, post_data: Dict[str, Any] = No
             "Content-Type": "application/json"
         }
         
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        # Use www.ameetpandey.com to avoid redirect
+        callback_url = settings.callback_url.replace("https://ameetpandey.com", "https://www.ameetpandey.com")
+        
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=False) as client:
             response = await client.post(
-                settings.callback_url,
+                callback_url,
                 json=payload,
                 headers=headers
             )
@@ -60,19 +79,13 @@ async def send_callback(job_id: str, status: str, post_data: Dict[str, Any] = No
 
 async def process_instagram_job(job_id: str, instagram_url: str):
     """
-    Process Instagram job - Full pipeline implementation
+    Process Instagram job using CSV metadata (NO SCRAPING)
     
     Pipeline:
-    1. Scrape Instagram post
+    1. Use metadata from job (from CSV)
     2. Generate blog with Gemini
     3. Create draft post in Supabase
     4. Send callback to Next.js
-    
-    Optional future enhancements:
-    - Content classification (videos/books/products)
-    - Social card generation
-    - Affiliate link detection
-    - YouTube video embedding
     """
     try:
         logger.info(f"🚀 Starting job {job_id} for {instagram_url}")
@@ -80,15 +93,42 @@ async def process_instagram_job(job_id: str, instagram_url: str):
         # Update status: processing
         await supabase_client.update_job_status(job_id, "processing")
         
-        # Step 1: Scrape Instagram
-        logger.info(f"📸 Step 1/3: Scraping Instagram...")
+        # Step 1: Get job metadata (from CSV via bulk import)
+        logger.info(f"📋 Step 1/3: Fetching job metadata...")
         await supabase_client.update_job_status(
             job_id,
             "processing",
-            progress={"step": "scraping", "message": "Extracting Instagram content..."}
+            progress={"step": "preparing", "message": "Loading metadata..."}
         )
         
-        reel_data = await instagram_scraper.scrape_post(instagram_url)
+        # Fetch job with metadata
+        job_data = await supabase_client.get_job(job_id)
+        metadata = job_data.get("metadata", {}) if job_data else {}
+        
+        # Extract data from metadata (populated by CSV bulk import)
+        title = metadata.get("title", "Instagram Post")
+        description = metadata.get("description", "")
+        category = metadata.get("category", "")
+        mentioned_content = metadata.get("mentioned_content", "")
+        reference_links = metadata.get("reference_links", "")
+        
+        # Build caption from CSV data
+        caption = f"""
+Title: {title}
+
+Description: {description}
+
+Category: {category}
+
+Mentioned: {mentioned_content}
+
+References: {reference_links}
+"""
+        
+        logger.info(f"✅ Using CSV metadata for {instagram_url}")
+        
+        # Extract YouTube links from references
+        youtube_links = extract_youtube_links(reference_links + " " + mentioned_content)
         
         # Step 2: Generate blog with Gemini
         logger.info(f"✍️  Step 2/3: Generating blog content...")
@@ -98,11 +138,21 @@ async def process_instagram_job(job_id: str, instagram_url: str):
             progress={"step": "generating", "message": "Creating blog article..."}
         )
         
-        # Default to 'general' content type (classification can be added later)
+        # Determine content type from CSV
+        content_type_map = {
+            "video": "videos",
+            "book": "books",
+            "product": "products",
+            "habit": "habits"
+        }
         content_type = "general"
+        for key, value in content_type_map.items():
+            if key in category.lower() or key in title.lower():
+                content_type = value
+                break
         
         blog_result = await gemini_generator.generate_blog(
-            caption=reel_data.caption,
+            caption=caption.strip(),
             content_type=content_type
         )
         
@@ -119,9 +169,9 @@ async def process_instagram_job(job_id: str, instagram_url: str):
             title=blog_result["title"],
             content=blog_result["content"],
             content_type=content_type,
-            youtube_links=reel_data.youtube_links,
-            social_card_url=None,  # TODO: Add card generation
-            affiliate_placeholders=None  # TODO: Add affiliate detection
+            youtube_links=youtube_links,
+            social_card_url=None,
+            affiliate_placeholders=None
         )
         
         # Update job: completed
@@ -133,7 +183,7 @@ async def process_instagram_job(job_id: str, instagram_url: str):
             "title": blog_result["title"],
             "word_count": blog_result["word_count"],
             "content_type": content_type,
-            "youtube_links": reel_data.youtube_links
+            "youtube_links": youtube_links
         }
         
         await send_callback(job_id, "completed", post_data=post_data)
