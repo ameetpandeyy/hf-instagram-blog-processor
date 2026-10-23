@@ -4,7 +4,7 @@ from functools import lru_cache
 class Settings(BaseSettings):
     # Gemini API
     gemini_api_key: str
-    gemini_model: str = "gemini-2.0-flash-exp"
+    gemini_model: str = "gemini-3.5-flash"
     
     # Supabase
     supabase_url: str

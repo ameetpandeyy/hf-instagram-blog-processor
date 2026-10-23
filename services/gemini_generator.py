@@ -1,4 +1,4 @@
-﻿"""Gemini Blog Generator - Generate 600-word blog articles using Gemini 2.0 Flash"""
+﻿"""Gemini Blog Generator - Generate 600-word blog articles using Gemini 3.5 Flash"""
 import logging
 import time
 from google import genai
@@ -8,7 +8,7 @@ from typing import Dict, Optional
 logger = logging.getLogger(__name__)
 
 class GeminiGenerator:
-    def __init__(self, api_key: str, model_name: str = "gemini-2.0-flash-exp"):
+    def __init__(self, api_key: str, model_name: str = "gemini-3.5-flash"):
         self.client = genai.Client(api_key=api_key)
         self.model_name = model_name
         self.rpm_limit = 15
