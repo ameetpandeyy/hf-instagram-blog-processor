@@ -1,16 +1,16 @@
-﻿"""Gemini Blog Generator - Generate 600-word blog articles"""
+﻿"""Gemini Blog Generator - Generate 600-word blog articles using Gemini 2.0 Flash"""
 import logging
 import time
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
 class GeminiGenerator:
-    def __init__(self, api_key: str, model_name: str = "gemini-1.5-flash"):
-        genai.configure(api_key=api_key)
-        # Use the correct model name format
-        self.model = genai.GenerativeModel(model_name)
+    def __init__(self, api_key: str, model_name: str = "gemini-2.0-flash-exp"):
+        self.client = genai.Client(api_key=api_key)
+        self.model_name = model_name
         self.rpm_limit = 15
         self.last_request_time = 0
         logger.info(f"Gemini generator initialized: {model_name}")
@@ -94,7 +94,11 @@ Write a comprehensive blog article (approximately 600 words) based on the Instag
                 
                 logger.info(f"Generating blog (attempt {attempt + 1}/{retries}, type: {content_type})")
                 
-                response = self.model.generate_content(prompt)
+                # Use new google-genai API
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt
+                )
                 
                 if not response.text:
                     raise ValueError("Empty response from Gemini")
@@ -123,4 +127,3 @@ Write a comprehensive blog article (approximately 600 words) based on the Instag
                 time.sleep(2 ** attempt)  # Exponential backoff
         
         raise Exception("Blog generation failed after all retries")
-
