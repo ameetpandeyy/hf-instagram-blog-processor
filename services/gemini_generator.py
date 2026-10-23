@@ -7,7 +7,7 @@ from typing import Dict, Optional
 logger = logging.getLogger(__name__)
 
 class GeminiGenerator:
-    def __init__(self, api_key: str, model_name: str = "gemini-1.5-flash-latest"):
+    def __init__(self, api_key: str, model_name: str = "gemini-1.5-flash"):
         genai.configure(api_key=api_key)
         # Use the correct model name format
         self.model = genai.GenerativeModel(model_name)
@@ -123,3 +123,4 @@ Write a comprehensive blog article (approximately 600 words) based on the Instag
                 time.sleep(2 ** attempt)  # Exponential backoff
         
         raise Exception("Blog generation failed after all retries")
+
