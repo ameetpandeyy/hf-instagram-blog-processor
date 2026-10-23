@@ -32,3 +32,6 @@ htmlcov/
 .DS_Store
 models/cached/*
 !models/cached/.gitkeep
+test-manual-trigger.ps1
+test-manual-trigger.py
+test-with-real-job.ps1
