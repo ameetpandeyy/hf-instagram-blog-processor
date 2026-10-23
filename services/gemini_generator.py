@@ -7,8 +7,9 @@ from typing import Dict, Optional
 logger = logging.getLogger(__name__)
 
 class GeminiGenerator:
-    def __init__(self, api_key: str, model_name: str = "gemini-1.5-flash"):
+    def __init__(self, api_key: str, model_name: str = "gemini-1.5-flash-latest"):
         genai.configure(api_key=api_key)
+        # Use the correct model name format
         self.model = genai.GenerativeModel(model_name)
         self.rpm_limit = 15
         self.last_request_time = 0

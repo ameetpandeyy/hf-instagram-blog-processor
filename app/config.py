@@ -1,10 +1,10 @@
-from pydantic_settings import BaseSettings
+﻿from pydantic_settings import BaseSettings
 from functools import lru_cache
 
 class Settings(BaseSettings):
     # Gemini API
     gemini_api_key: str
-    gemini_model: str = "gemini-1.5-flash"
+    gemini_model: str = "gemini-1.5-flash-latest"
     
     # Supabase
     supabase_url: str
@@ -26,3 +26,4 @@ class Settings(BaseSettings):
 @lru_cache()
 def get_settings() -> Settings:
     return Settings()
+
