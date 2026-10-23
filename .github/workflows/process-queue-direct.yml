@@ -13,8 +13,8 @@ jobs:
       - name: Check configuration
         id: check-config
         run: |
-          if [ -z "${{ secrets.HF_WEBHOOK_SECRET }}" ]; then
-            echo "⚠️  HF_WEBHOOK_SECRET not configured yet"
+          if [ -z "${{ secrets.WEBHOOK_SECRET }}" ]; then
+            echo "⚠️  WEBHOOK_SECRET not configured yet"
             echo "configured=false" >> $GITHUB_OUTPUT
             exit 0
           fi
@@ -27,7 +27,7 @@ jobs:
           SUPABASE_URL: https://rjknfmbgtrptusoqgzta.supabase.co
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           HF_SPACE_URL: https://ameetspeaks-templeappai.hf.space
-          HF_WEBHOOK_SECRET: ${{ secrets.HF_WEBHOOK_SECRET }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
         run: |
           echo "🔍 Fetching pending jobs..."
           
@@ -58,7 +58,7 @@ jobs:
           
           RESPONSE=$(curl -X POST "$HF_SPACE_URL/webhook/process-job" \
             -H "Content-Type: application/json" \
-            -H "X-Webhook-Secret: $HF_WEBHOOK_SECRET" \
+            -H "X-Webhook-Secret: $WEBHOOK_SECRET" \
             -d "$PAYLOAD" \
             -w "\n%{http_code}" \
             -s)
