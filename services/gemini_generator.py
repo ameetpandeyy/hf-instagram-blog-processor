@@ -1,4 +1,4 @@
-﻿"""Gemini Blog Generator - Generate 600-word blog articles using Gemini 3.5 Flash"""
+﻿"""Gemini Blog Generator - Generate 800+ word blog articles using Gemini 3.5 Flash"""
 import logging
 import time
 from google import genai
@@ -29,40 +29,50 @@ class GeminiGenerator:
         """Build optimized prompt based on content type"""
         
         base_prompt = f"""
-You are a skilled content writer creating engaging blog posts for ameetpandey.com.
+You are a skilled content writer creating SEO-optimized blog posts for ameetpandey.com.
 
 **Content Type**: {content_type}
 **Instagram Caption**: 
 {caption}
 
 **Instructions**:
-Write a comprehensive blog article (approximately 600 words) based on the Instagram content above.
+Write a comprehensive, in-depth blog article (MINIMUM 800 words, target 900-1000 words) based on the Instagram content above.
 
 **Structure**:
 1. **Catchy Title** - Create an SEO-friendly, engaging title
-2. **Introduction** (80-100 words) - Hook the reader with the main idea
-3. **Main Content** (400-450 words) - Expand on the Instagram content with:
-   - Clear explanations and examples
-   - Practical insights or actionable tips
+2. **Introduction** (120-150 words) - Hook the reader with the main idea, set expectations
+3. **Main Content** (600-750 words) - Expand on the Instagram content with:
+   - Clear explanations and detailed examples
+   - Practical insights or actionable tips with step-by-step guidance
    - Personal anecdotes or relatable stories (if applicable)
-   - Use subheadings (##) to organize sections
-4. **Conclusion** (50-70 words) - Summarize key takeaways
+   - Use subheadings (##) to organize sections (aim for 4-6 subheadings)
+   - Add context, background, or supporting data where relevant
+   - Include "why this matters" for each major point
+4. **Conclusion** (80-100 words) - Summarize key takeaways and provide a call-to-action
 
 **Tone**: Conversational, authentic, and engaging (like talking to a friend)
+
+**CRITICAL**: The article MUST be at least 800 words. If the content seems short, add:
+- More detailed explanations
+- Additional examples or case studies
+- Expanded context or background
+- Deeper "how-to" steps
+- Common mistakes to avoid
+- FAQ-style subsections
 
 **Special Instructions for {content_type}**:
 """
         
         type_specific = {
-            "videos": "Focus on the video's key message. Add a '## Watch the Video' section with placeholder [VIDEO_EMBED]",
-            "books": "Highlight key lessons from the book. Add a '## Get the Book' section with [AFFILIATE_PLACEHOLDER] for the book link",
-            "products": "Explain the product's benefits and use cases. Include [AFFILIATE_PLACEHOLDER] where relevant",
-            "habits": "Provide step-by-step guidance on building the habit. Include scientific backing if relevant",
-            "general": "Expand on the core message with depth and practical examples"
+            "videos": "Focus on the video's key message. Add detailed summaries of each video. Include a '## Watch the Videos' section with placeholders [VIDEO_EMBED_1], [VIDEO_EMBED_2], etc. Explain why each video is valuable and what viewers will learn.",
+            "books": "Highlight key lessons from the book with detailed explanations. Add a '## Get the Book' section with [AFFILIATE_PLACEHOLDER] for the book link. Include quotes or concepts from the book. Explain how to apply these lessons practically.",
+            "products": "Explain the product's benefits and use cases in detail. Include [AFFILIATE_PLACEHOLDER] where relevant. Add pros/cons, comparison with alternatives, and specific use cases. Explain who this product is for.",
+            "habits": "Provide step-by-step guidance on building the habit with detailed instructions. Include scientific backing if relevant. Add common pitfalls, troubleshooting tips, and progress tracking methods. Explain the psychology behind the habit.",
+            "general": "Expand on the core message with substantial depth and practical examples. Add context, real-world applications, and actionable next steps. Include multiple perspectives or angles on the topic."
         }
         
         prompt = base_prompt + type_specific.get(content_type, type_specific["general"])
-        prompt += "\n\n**Output Format**: Pure markdown. Start with # Title, then content sections."
+        prompt += "\n\n**Output Format**: Pure markdown. Start with # Title, then content sections. MINIMUM 800 WORDS."
         
         return prompt
     
@@ -112,6 +122,10 @@ Write a comprehensive blog article (approximately 600 words) based on the Instag
                 
                 word_count = len(content.split())
                 logger.info(f"✅ Generated blog: {word_count} words, title: {title[:50]}...")
+                
+                # Warn if below 800 words (but don't fail)
+                if word_count < 800:
+                    logger.warning(f"⚠️  Word count below target: {word_count}/800 words")
                 
                 return {
                     "title": title,

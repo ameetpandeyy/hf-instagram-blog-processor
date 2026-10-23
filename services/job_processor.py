@@ -1,13 +1,15 @@
-﻿"""Job Processor - Orchestrates Instagram-to-blog pipeline (CSV-based, no scraping)"""
+﻿"""Job Processor - Orchestrates Instagram-to-blog pipeline with hero image generation"""
 import logging
 import httpx
 import hashlib
 import hmac
 import re
+import uuid
 from typing import Dict, Any, List
 from app.config import get_settings
 from services.gemini_generator import GeminiGenerator
 from services.supabase_client import SupabaseClient
+from services.hero_image_generator import HeroImageGenerator
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -21,6 +23,7 @@ supabase_client = SupabaseClient(
     url=settings.supabase_url,
     service_key=settings.supabase_service_key
 )
+hero_image_generator = HeroImageGenerator()
 
 def extract_youtube_links(text: str) -> List[str]:
     """Extract YouTube URLs from text"""
@@ -84,8 +87,11 @@ async def process_instagram_job(job_id: str, instagram_url: str):
     Pipeline:
     1. Use metadata from job (from CSV)
     2. Generate blog with Gemini
-    3. Create draft post in Supabase
-    4. Send callback to Next.js
+    3. Generate hero image
+    4. Upload hero image to Supabase Storage
+    5. Create media record in database
+    6. Create draft post in Supabase
+    7. Send callback to Next.js
     """
     try:
         logger.info(f"🚀 Starting job {job_id} for {instagram_url}")
@@ -94,7 +100,7 @@ async def process_instagram_job(job_id: str, instagram_url: str):
         await supabase_client.update_job_status(job_id, "processing")
         
         # Step 1: Get job metadata (from CSV via bulk import)
-        logger.info(f"📋 Step 1/3: Fetching job metadata...")
+        logger.info(f"📋 Step 1/5: Fetching job metadata...")
         await supabase_client.update_job_status(
             job_id,
             "processing",
@@ -131,7 +137,7 @@ References: {reference_links}
         youtube_links = extract_youtube_links(reference_links + " " + mentioned_content)
         
         # Step 2: Generate blog with Gemini
-        logger.info(f"✍️  Step 2/3: Generating blog content...")
+        logger.info(f"✍️  Step 2/5: Generating blog content...")
         await supabase_client.update_job_status(
             job_id,
             "processing",
@@ -156,8 +162,38 @@ References: {reference_links}
             content_type=content_type
         )
         
-        # Step 3: Create draft post
-        logger.info(f"💾 Step 3/3: Saving to database...")
+        # Step 3: Generate hero image
+        logger.info(f"🎨 Step 3/5: Generating hero image...")
+        await supabase_client.update_job_status(
+            job_id,
+            "processing",
+            progress={"step": "generating_image", "message": "Creating hero image..."}
+        )
+        
+        hero_image_bytes = hero_image_generator.generate_hero_image(blog_result["title"])
+        
+        # Step 4: Upload hero image to Supabase Storage
+        logger.info(f"☁️  Step 4/5: Uploading hero image...")
+        await supabase_client.update_job_status(
+            job_id,
+            "processing",
+            progress={"step": "uploading", "message": "Uploading hero image..."}
+        )
+        
+        # Generate unique filename
+        image_filename = f"hero-{uuid.uuid4()}.png"
+        storage_path = f"auto-generated/{image_filename}"
+        
+        hero_media_id = await supabase_client.upload_and_create_media(
+            image_bytes=hero_image_bytes,
+            storage_path=storage_path,
+            alt_text=f"Hero image for: {blog_result['title']}",
+            file_type="image/png",
+            file_size=len(hero_image_bytes)
+        )
+        
+        # Step 5: Create draft post
+        logger.info(f"💾 Step 5/5: Saving to database...")
         await supabase_client.update_job_status(
             job_id,
             "processing",
@@ -170,7 +206,7 @@ References: {reference_links}
             content=blog_result["content"],
             content_type=content_type,
             youtube_links=youtube_links,
-            social_card_url=None,
+            hero_media_id=hero_media_id,
             affiliate_placeholders=None
         )
         
@@ -183,7 +219,8 @@ References: {reference_links}
             "title": blog_result["title"],
             "word_count": blog_result["word_count"],
             "content_type": content_type,
-            "youtube_links": youtube_links
+            "youtube_links": youtube_links,
+            "hero_media_id": hero_media_id
         }
         
         await send_callback(job_id, "completed", post_data=post_data)

@@ -69,6 +69,50 @@ class SupabaseClient:
         word_count = len(content.split())
         return max(1, round(word_count / 200))
     
+    async def upload_and_create_media(
+        self,
+        image_bytes: bytes,
+        storage_path: str,
+        alt_text: str,
+        file_type: str = "image/png",
+        file_size: int = 0
+    ) -> str:
+        """
+        Upload image to Supabase Storage and create media record
+        
+        Returns:
+            Media UUID
+        """
+        try:
+            # Upload to storage (bucket: media)
+            self.client.storage.from_("media").upload(
+                storage_path,
+                image_bytes,
+                file_options={"content-type": file_type}
+            )
+            
+            logger.info(f"✅ Uploaded image to storage: {storage_path}")
+            
+            # Create media record
+            media_data = {
+                "storage_path": storage_path,
+                "alt_text": alt_text,
+                "file_type": file_type,
+                "file_size": file_size,
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            result = self.client.table("media").insert(media_data).execute()
+            media_id = result.data[0]["id"]
+            
+            logger.info(f"✅ Created media record: {media_id}")
+            return media_id
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to upload and create media: {str(e)}")
+            raise
+    
     async def create_draft_post(
         self,
         instagram_url: str,
@@ -76,7 +120,7 @@ class SupabaseClient:
         content: str,
         content_type: str,
         youtube_links: list,
-        social_card_url: Optional[str] = None,
+        hero_media_id: Optional[str] = None,
         affiliate_placeholders: Optional[list] = None
     ) -> str:
         """
@@ -105,6 +149,7 @@ class SupabaseClient:
                 "status": "draft",
                 "read_minutes": read_minutes,
                 "affiliate": bool(affiliate_placeholders),
+                "hero_media_id": hero_media_id,
                 "ig_caption": f"From Instagram: {instagram_url}",
                 "created_at": datetime.utcnow().isoformat(),
                 "updated_at": datetime.utcnow().isoformat()
