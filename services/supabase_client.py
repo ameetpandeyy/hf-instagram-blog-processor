@@ -1,4 +1,4 @@
-﻿"""Supabase Client - Database operations"""
+"""Supabase Client - Database operations"""
 import logging
 from typing import Dict, Optional, Any
 from supabase import create_client, Client
@@ -93,12 +93,10 @@ class SupabaseClient:
             
             logger.info(f"✅ Uploaded image to storage: {storage_path}")
             
-            # Create media record
+            # Create media record (only columns that exist in schema)
             media_data = {
                 "storage_path": storage_path,
                 "alt_text": alt_text,
-                "file_type": file_type,
-                "file_size": file_size,
                 "created_at": datetime.utcnow().isoformat(),
                 "updated_at": datetime.utcnow().isoformat()
             }
