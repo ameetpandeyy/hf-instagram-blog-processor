@@ -1,3 +1,13 @@
+---
+title: Teamo API
+emoji: 💬
+colorFrom: pink
+colorTo: purple
+sdk: docker
+pinned: false
+app_port: 7860
+---
+
 # TeAmo Backend - FastAPI on Hugging Face Spaces
 
 This is the production-ready, cost-optimized FastAPI backend for the **TeAmo** AI Companion mobile and web app.
