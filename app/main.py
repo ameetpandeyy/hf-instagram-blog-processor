@@ -337,3 +337,28 @@ async def list_user_memories(
     user_id = str(current_user.get("id", ""))
     facts = get_user_memories(user_id, persona_id)
     return {"user_id": user_id, "memories": facts}
+
+class GenerateImageRequest(BaseModel):
+    persona_id: str
+    prompt: str
+    category: Optional[str] = "avatars"
+    engine: Optional[str] = "gemini"
+
+@app.post("/api/personas/generate-image")
+async def generate_persona_image_endpoint(req: GenerateImageRequest):
+    """
+    Generates image via Gemini/Hugging Face, compresses to <200KB, uploads to Supabase Storage, and returns public URL.
+    """
+    from app.image_gen import generate_and_store_persona_image
+    try:
+        url = await generate_and_store_persona_image(
+            persona_id=req.persona_id,
+            prompt=req.prompt,
+            category=req.category or "avatars",
+            engine=req.engine or "gemini"
+        )
+        return {"success": True, "url": url}
+    except Exception as e:
+        logger.error(f"Image generation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
