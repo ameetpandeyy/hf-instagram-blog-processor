@@ -9,7 +9,7 @@ class Settings:
     SUPABASE_SERVICE_ROLE_KEY: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 
     # Firebase Admin Configuration
-    FIREBASE_PROJECT_ID: str = os.getenv("FIREBASE_PROJECT_ID", "teamo-ai")
+    FIREBASE_PROJECT_ID: str = os.getenv("FIREBASE_PROJECT_ID", "teamo-ea8f2")
     FIREBASE_CREDENTIALS_PATH: str = os.getenv("FIREBASE_CREDENTIALS_PATH", "")
 
     # Gemini AI Configuration (Cost-optimized: gemini-2.0-flash / gemini-1.5-flash)
