@@ -17,6 +17,12 @@ class Settings:
     DEFAULT_CHAT_MODEL: str = os.getenv("DEFAULT_CHAT_MODEL", "gemini-2.0-flash")
     MEMORY_EXTRACTION_MODEL: str = os.getenv("MEMORY_EXTRACTION_MODEL", "gemini-2.0-flash")
 
+    # Hugging Face Configuration (FLUX.1-schnell / SDXL)
+    HF_TOKEN: str = os.getenv("HF_TOKEN", "")
+
+    # Supabase Anon Key (for client-facing public reads or storage)
+    SUPABASE_ANON_KEY: str = os.getenv("SUPABASE_ANON_KEY", "")
+
     # Security & Admin
     ADMIN_API_KEY: str = os.getenv("ADMIN_API_KEY", "teamo_secret_admin_key_2026")
     ADMOB_SSV_KEY: str = os.getenv("ADMOB_SSV_KEY", "")

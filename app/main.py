@@ -1,6 +1,7 @@
 import logging
+import uuid
 from typing import List, Optional, Dict, Any
-from fastapi import FastAPI, Depends, HTTPException, status, Header
+from fastapi import FastAPI, Depends, HTTPException, status, Header, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -338,11 +339,72 @@ async def list_user_memories(
     facts = get_user_memories(user_id, persona_id)
     return {"user_id": user_id, "memories": facts}
 
+generation_jobs: Dict[str, Dict[str, Any]] = {}
+
 class GenerateImageRequest(BaseModel):
     persona_id: str
-    prompt: str
+    prompt: Optional[str] = None
     category: Optional[str] = "avatars"
-    engine: Optional[str] = "gemini"
+    scene_tag: Optional[str] = "avatar"
+    engine: Optional[str] = "auto"
+    aspect_ratio: Optional[str] = "1:1"
+
+class BatchGenerateRequest(BaseModel):
+    personas: Optional[List[str]] = Field(default_factory=lambda: ["all"])
+    modes: Optional[List[str]] = Field(default_factory=lambda: ["avatars", "gallery"])
+    engine: Optional[str] = "auto"
+
+async def _run_batch_generation_task(job_id: str, personas: List[str], modes: List[str], engine: str):
+    from app.image_gen import generate_and_store_persona_image, PERSONA_PROMPT_BLUEPRINTS
+    target_personas = list(PERSONA_PROMPT_BLUEPRINTS.keys()) if "all" in personas else personas
+    gallery_tags = ["beach", "club", "travel", "music", "cafe"]
+
+    generation_jobs[job_id]["status"] = "processing"
+    generated_items = []
+
+    try:
+        # 1. Avatars
+        if "avatars" in modes or "all" in modes:
+            for pid in target_personas:
+                generation_jobs[job_id]["current"] = f"avatar: {pid}"
+                try:
+                    res = await generate_and_store_persona_image(
+                        persona_id=pid,
+                        category="avatars",
+                        scene_tag="avatar",
+                        engine=engine,
+                        aspect_ratio="1:1"
+                    )
+                    generated_items.append(res)
+                    generation_jobs[job_id]["results"].append(res)
+                except Exception as ex:
+                    logger.error(f"Failed to generate avatar for {pid}: {ex}")
+
+        # 2. Romantic Gallery Scenes
+        if "gallery" in modes or "all" in modes:
+            for tag in gallery_tags:
+                generation_jobs[job_id]["current"] = f"gallery: {tag}"
+                try:
+                    # Representative romantic model persona for scene
+                    sample_pid = target_personas[0] if target_personas else "sara"
+                    res = await generate_and_store_persona_image(
+                        persona_id=sample_pid,
+                        category="gallery",
+                        scene_tag=tag,
+                        engine=engine,
+                        aspect_ratio="3:4"
+                    )
+                    generated_items.append(res)
+                    generation_jobs[job_id]["results"].append(res)
+                except Exception as ex:
+                    logger.error(f"Failed to generate gallery scene {tag}: {ex}")
+
+        generation_jobs[job_id]["status"] = "completed"
+        generation_jobs[job_id]["current"] = "done"
+    except Exception as e:
+        logger.error(f"Batch generation job {job_id} encountered error: {e}")
+        generation_jobs[job_id]["status"] = "failed"
+        generation_jobs[job_id]["error"] = str(e)
 
 @app.post("/api/personas/generate-image")
 async def generate_persona_image_endpoint(req: GenerateImageRequest):
@@ -351,14 +413,62 @@ async def generate_persona_image_endpoint(req: GenerateImageRequest):
     """
     from app.image_gen import generate_and_store_persona_image
     try:
-        url = await generate_and_store_persona_image(
+        result = await generate_and_store_persona_image(
             persona_id=req.persona_id,
             prompt=req.prompt,
             category=req.category or "avatars",
-            engine=req.engine or "gemini"
+            scene_tag=req.scene_tag or "avatar",
+            engine=req.engine or "auto",
+            aspect_ratio=req.aspect_ratio or "1:1"
         )
-        return {"success": True, "url": url}
+        return result
     except Exception as e:
         logger.error(f"Image generation failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/personas/batch-generate-background")
+async def trigger_batch_generation_background(
+    req: BatchGenerateRequest,
+    background_tasks: BackgroundTasks
+):
+    """
+    Asynchronously triggers batch persona image generation in the background.
+    Ideal for serverless/long-running generation tasks to prevent HTTP timeouts.
+    """
+    job_id = str(uuid.uuid4())[:8]
+    generation_jobs[job_id] = {
+        "job_id": job_id,
+        "status": "queued",
+        "current": "initializing",
+        "results": [],
+        "personas": req.personas,
+        "modes": req.modes,
+        "engine": req.engine
+    }
+
+    background_tasks.add_task(
+        _run_batch_generation_task,
+        job_id=job_id,
+        personas=req.personas or ["all"],
+        modes=req.modes or ["avatars", "gallery"],
+        engine=req.engine or "auto"
+    )
+
+    return {
+        "success": True,
+        "job_id": job_id,
+        "status": "queued",
+        "message": "Persona image generation started in background.",
+        "status_url": f"/api/personas/batch-status/{job_id}"
+    }
+
+@app.get("/api/personas/batch-status/{job_id}")
+async def get_batch_generation_status(job_id: str):
+    """
+    Checks the real-time progress and output URLs of a background persona generation task.
+    """
+    job = generation_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job ID not found.")
+    return job
 
