@@ -1,0 +1,37 @@
+name: Sync to HuggingFace Space
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  sync-to-hub:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Push to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ secrets.HF_SPACE || 'ameetspeaks/teamo-backend' }}
+        run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo "❌ Error: HF_TOKEN secret is not set in GitHub repository settings!"
+            echo "Please go to: GitHub Repository -> Settings -> Secrets and variables -> Actions"
+            echo "Add a new secret named HF_TOKEN containing your Hugging Face write token (from https://huggingface.co/settings/tokens)."
+            exit 1
+          fi
+
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+          echo "🚀 Pushing updates to Hugging Face Space: $HF_SPACE"
+          git remote add space "https://user:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE" 2>/dev/null || git remote set-url space "https://user:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE"
+          git push space main:main --force
+          echo "✅ Successfully synced updates to Hugging Face Space: https://huggingface.co/spaces/$HF_SPACE"
